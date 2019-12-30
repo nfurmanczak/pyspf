@@ -1,2 +1,1 @@
-# pyspf
-SPF validator in Python 3
+## SPF check with BASH
