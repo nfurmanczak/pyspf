@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script to verify and check SPF records in DNS zones
-# nikolai@furmanczak.de
+# Found bugs? Mail me! nikolai@furmanczak.de
 
 domain=$1
 
@@ -9,13 +9,24 @@ if [ ! -n "$domain" ]; then
 	exit
 fi
 
+needestools=(dig grep sed)
+
+for i in "${needestools[@]}"
+do
+	which $i &> /dev/null
+	if [ $? -eq 1 ]; then
+		echo -e "\e[31mERROR:\e[0m Command $i not found. Please install the $i tool\nExit."
+		exit 1
+	fi
+done
+
 
 spfrr=$(dig -t txt $domain | egrep -o "v=spf1.*" | tr -d \")
 
 # Check for SenderID alias SPF Version 2
 if dig -t txt $domain | grep --quiet "v=spf2"; then
 	echo -e "\e[32mWarning \e[0m"
-	echo "It seems that a SenderID DNS (aka spf2) record has been set for this domain. "
+	echo "It seems that a SenderID DNS record (aka spfv2) has been set for this domain. "
 	echo "The SenderID is not commonly supported by mailbox providers and not a substitute or replacement for SPF."
 fi
 
@@ -25,7 +36,6 @@ else
 	echo -e "\e[31mNo SPF record found for domain:\e[0m $domain"
 	exit
 fi
-
 
 
 if echo $spfrr | egrep --quiet "[+]{1}all$" ; then
@@ -49,25 +59,31 @@ ip6_net=(`echo $spfrr | egrep -o "ip6:[0-9:a-fA-F]*\/[0-9]{1,3}" | sed -e 's/^ip
 a=(`echo $spfrr | egrep -o "\+?a:[a-zA-Zöäü\.-]+" | sed -e 's/^a://g'`)
 mx=(`echo $spfrr | egrep -o "\+?mx:[a-zA-Zöäü\.-]+" | sed -e 's/^a://g'`)
 
-
-echo $spfrr
+echo -e "\n$spfrr"
 
 # Check if spfrr end with all
 if ! echo $spfrr | egrep --quiet "[?~-]{1}all$" ; then
 	echo "No all mechanisms in SPF record. Please add -all/~all or ?all to this SPF record."
 fi
 
-
-echo ""
-echo "Additional information: "
-echo "------------------------"
-echo -e "SPF policy: $allcheck"
+echo -e "\nAdditional information: "
+echo -e "------------------------"
+echo -e "SPF policy: $allcheck\n"
 
 for i in "${spfmechanisms[@]}"
 do
 	eval 'array_count=${#'"$i"'[@]}'
 	if [[ $array_count -gt "0" ]] ; then
-		var=$i[@]
-		echo "$i: ${!var}"
+
+		if [[ "$i" == "include"  ]] ; then
+				for x in "${include[@]}"
+				do
+					includerr=$(dig -t txt $x | egrep -o "v=spf1.*" | tr -d \" | sed -e 's/^v=spf1 //')
+					echo "include $x: ($includerr)"
+				done
+		else
+			var=$i[@]
+			echo "$i: ${!var}"
+		fi
 	fi
 done
