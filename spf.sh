@@ -1,4 +1,5 @@
 #!/bin/bash
+#
 # Script to verify and check SPF records in DNS zones
 # Found bugs? Mail me! nikolai@furmanczak.de
 
